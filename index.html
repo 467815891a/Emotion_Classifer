@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>情绪分类器</title>
+<script src="src/ort.all.min.js"></script>
+<script src="src/jszip.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+.header{background:linear-gradient(135deg,#1e293b,#334155);padding:16px 32px;border-bottom:1px solid #475569}
+.header h1{font-size:20px;font-weight:600}
+.header p{font-size:12px;color:#94a3b8;margin-top:2px}
+.main-layout{display:flex;gap:20px;padding:20px 24px;max-width:1600px;margin:0 auto;align-items:flex-start}
+.column{flex:1;min-width:0}
+.column-title{font-size:17px;font-weight:600;padding:10px 16px;background:linear-gradient(135deg,#1e293b,#334155);border-radius:10px 10px 0 0;border:1px solid #475569;border-bottom:none;color:#f1f5f9;text-align:center}
+.column-title.left-title{border-bottom:3px solid #3b82f6}
+.column-title.right-title{border-bottom:3px solid #22c55e}
+.column-body{background:#1e293b;border:1px solid #334155;border-top:none;border-radius:0 0 10px 10px;padding:16px}
+.card{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:18px;margin-bottom:14px}
+.card h2{font-size:15px;margin-bottom:12px;color:#f1f5f9}
+.btn{padding:8px 18px;border:none;border-radius:7px;font-size:13px;cursor:pointer;transition:all .2s;font-weight:500}
+.btn-primary{background:#3b82f6;color:#fff}
+.btn-primary:hover{background:#2563eb}
+.btn-primary:disabled{background:#1e40af;cursor:not-allowed;opacity:.6}
+.btn-success{background:#22c55e;color:#fff}
+.btn-success:hover{background:#16a34a}
+.btn-success:disabled{background:#166534;cursor:not-allowed;opacity:.6}
+.btn-danger{background:#ef4444;color:#fff}
+.btn-danger:hover{background:#dc2626}
+.btn-outline{background:transparent;border:1px solid #475569;color:#e2e8f0}
+.btn-outline:hover{border-color:#60a5fa;color:#60a5fa}
+.btn-warning{background:#f59e0b;color:#fff}
+.btn-warning:hover{background:#d97706}
+.btn-sm{padding:5px 12px;font-size:12px}
+.progress-bar{width:100%;height:8px;background:#334155;border-radius:4px;overflow:hidden;margin:6px 0}
+.progress-fill{height:100%;border-radius:4px;transition:width .3s}
+.progress-fill.total{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+.stat{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px;text-align:center}
+.stat .label{font-size:11px;color:#94a3b8;margin-bottom:3px}
+.stat .value{font-size:17px;font-weight:600;color:#f1f5f9}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500}
+.badge-running{background:#1e40af;color:#93c5fd;animation:pulse 1.5s infinite}
+.badge-idle{background:#334155;color:#94a3b8}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.current-progress{margin:12px 0}
+.progress-label{display:flex;justify-content:space-between;font-size:12px;color:#94a3b8;margin-bottom:3px}
+.collapsible-header{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:8px 0;user-select:none}
+.collapsible-header h3{font-size:13px;color:#94a3b8;font-weight:500}
+.collapsible-arrow{font-size:11px;color:#94a3b8;transition:transform .3s}
+.collapsible-arrow.open{transform:rotate(180deg)}
+.collapsible-body{max-height:0;overflow:hidden;transition:max-height .4s ease}
+.collapsible-body.open{max-height:4000px}
+.collapsible-body.always-open{max-height:none}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-top:10px}
+.gallery-item{background:#1e293b;border:1px solid #334155;border-radius:6px;overflow:hidden;text-align:center;position:relative}
+.gallery-item img{width:100%;height:80px;object-fit:cover}
+.gallery-item .name{font-size:9px;padding:3px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gallery-item .delete-btn{position:absolute;top:3px;right:3px;background:rgba(239,68,68,0.9);color:#fff;border:none;border-radius:3px;width:20px;height:20px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+.gallery-item:hover .delete-btn{opacity:1}
+.pagination{display:flex;gap:6px;align-items:center;margin-top:10px;justify-content:center}
+.pagination button{padding:4px 12px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;border-radius:5px;cursor:pointer;font-size:12px}
+.pagination button:disabled{opacity:.4;cursor:not-allowed}
+.pagination span{font-size:12px;color:#94a3b8}
+.preview-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.preview-tab{padding:5px 14px;border:1px solid #334155;background:transparent;color:#94a3b8;border-radius:5px;cursor:pointer;font-size:12px}
+.preview-tab.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
+.category-tab{padding:8px 20px;font-size:14px;border-radius:7px}
+.upload-area{margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.upload-area input[type="file"]{display:none}
+.camera-container{position:relative;width:100%;max-width:480px;margin:0 auto;border-radius:10px;overflow:hidden;background:#000}
+.camera-container video{width:100%;display:block;transform:scaleX(-1);border-radius:10px}
+.capture-overlay{position:absolute;top:0;left:0;width:100%;height:100%;z-index:5;display:none}
+.capture-overlay canvas{width:100%;display:block;border-radius:10px}
+.capture-actions-bar{position:absolute;bottom:12px;left:0;right:0;display:flex;gap:10px;justify-content:center;z-index:20;display:none}
+.camera-actions{display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.capture-result{margin-top:14px;text-align:center}
+.capture-result .detail{margin-top:6px;color:#94a3b8;font-size:13px}
+.camera-placeholder{text-align:center;padding:40px 16px;color:#475569}
+.camera-placeholder p{font-size:13px;margin-top:6px}
+.live-crop-box{position:absolute;border:3px solid #60a5fa;border-radius:4px;cursor:move;touch-action:none;z-index:10;aspect-ratio:1/1}
+.live-crop-box::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(96,165,250,0.08);border-radius:2px}
+.live-crop-box .handle{position:absolute;width:14px;height:14px;background:#60a5fa;border:2px solid #fff;border-radius:3px;z-index:11}
+.live-crop-box .handle.tl{top:-7px;left:-7px;cursor:nw-resize}
+.live-crop-box .handle.tr{top:-7px;right:-7px;cursor:ne-resize}
+.live-crop-box .handle.bl{bottom:-7px;left:-7px;cursor:sw-resize}
+.live-crop-box .handle.br{bottom:-7px;right:-7px;cursor:se-resize}
+.live-crop-hint{position:absolute;bottom:-28px;left:50%;transform:translateX(-50%);font-size:12px;color:#60a5fa;white-space:nowrap;z-index:10}
+.cropped-preview{margin-top:14px;text-align:center}
+.cropped-preview .result-label{font-size:22px;font-weight:700;margin-top:8px}
+.label-happy{color:#4ade80}
+.label-sad{color:#60a5fa}
+.cropped-actions{display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:100;justify-content:center;align-items:center}
+.modal-overlay.show{display:flex}
+.modal-box{background:#1e293b;border:1px solid #475569;border-radius:12px;padding:24px;min-width:300px;text-align:center}
+.modal-box h3{font-size:16px;margin-bottom:16px;color:#f1f5f9}
+.modal-box .modal-btns{display:flex;gap:12px;justify-content:center;margin-top:16px}
+.result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:12px}
+.result-card{background:#1e293b;border:1px solid #334155;border-radius:6px;overflow:hidden}
+.result-card img{width:100%;height:110px;object-fit:cover}
+.result-card .info{padding:8px;font-size:11px}
+.result-card .info .tag{display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:500}
+.tag-correct{background:#166534;color:#4ade80}
+.tag-wrong{background:#991b1b;color:#fca5a5}
+.model-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.log-area{background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px;margin-top:8px;max-height:150px;overflow-y:auto;font-size:11px;color:#94a3b8;font-family:monospace}
+.log-area .log-line{margin:2px 0}
+.log-info{color:#60a5fa}
+.log-success{color:#4ade80}
+.log-error{color:#fca5a5}
+.log-warn{color:#fbbf24}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🎭 情绪分类器</h1>
+  <p id="header-desc">特征提取 · ORT Inference + JS 分类头微调 · 开心 / 伤心 二分类</p>
+</div>
+<div class="main-layout">
+
+<!-- ========== 左栏：模型训练 ========== -->
+<div class="column">
+  <div class="column-title left-title">📚 模型训练</div>
+  <div class="column-body">
+
+    <div class="card">
+      <div class="collapsible-header" onclick="toggleCollapse('preview-body','preview-arrow')">
+        <h3>📂 训练样本预览</h3>
+        <span class="collapsible-arrow open" id="preview-arrow">▼</span>
+      </div>
+      <div class="collapsible-body always-open" id="preview-body">
+        <div class="preview-tabs">
+          <div class="preview-tab active" onclick="switchPreview('happy',this)">😊 开心</div>
+          <div class="preview-tab" onclick="switchPreview('sad',this)">😢 伤心</div>
+        </div>
+        <div class="upload-area">
+          <input type="file" id="train-upload-input" accept="image/*" multiple onchange="uploadTrainImages()">
+          <button class="btn btn-success btn-sm" onclick="document.getElementById('train-upload-input').click()">📤 上传图片</button>
+          <button class="btn btn-primary btn-sm" id="btn-load-train" onclick="loadTestExamplesAsTrainData()">📂 加载默认训练样本</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteAllTrainImages()">🗑️ 删除当前分类全部</button>
+          <span id="train-upload-status" style="font-size:12px;color:#94a3b8"></span>
+        </div>
+        <div id="preview-gallery" class="gallery"></div>
+        <div class="pagination" id="preview-pagination"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2>训练控制</h2>
+        <span id="train-badge" class="badge badge-idle">空闲</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="label">训练准确率</div><div class="value" id="s-train-acc">-</div></div>
+        <div class="stat"><div class="label">已用时间</div><div class="value" id="s-elapsed">-</div></div>
+      </div>
+      <div class="current-progress">
+        <div class="progress-label"><span id="progress-text">等待开始...</span><span id="progress-pct"></span></div>
+        <div class="progress-bar"><div class="progress-fill total" id="progress-fill" style="width:0%"></div></div>
+      </div>
+      <button class="btn btn-primary" id="btn-train" onclick="startTrain()">开始训练</button>
+      <div class="model-actions">
+        <button class="btn btn-success btn-sm" id="btn-export" onclick="exportModel()" disabled>📦 导出模型</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('import-input').click()">📥 导入模型</button>
+        <input type="file" id="import-input" accept=".zip" style="display:none" onchange="importModel(event)">
+      </div>
+      <div class="log-area" id="train-log"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ========== 右栏：模型验证 ========== -->
+<div class="column">
+  <div class="column-title right-title">🔍 模型验证</div>
+  <div class="column-body">
+
+    <div class="card">
+      <h2>摄像头采集样本</h2>
+      <div id="camera-area">
+        <div class="camera-placeholder" id="camera-placeholder">
+          <p style="font-size:36px">📷</p>
+          <p>点击下方按钮开启摄像头</p>
+        </div>
+        <div class="camera-container" id="camera-container" style="display:none">
+          <video id="camera-video" autoplay playsinline></video>
+          <img id="uploaded-image" style="width:100%;display:none;border-radius:10px" />
+          <div class="capture-overlay" id="capture-overlay">
+            <canvas id="freeze-canvas"></canvas>
+          </div>
+          <div class="live-crop-box" id="live-crop-box" style="display:none;left:25%;top:15%;width:50%;height:50%">
+            <div class="handle tl" data-handle="tl"></div>
+            <div class="handle tr" data-handle="tr"></div>
+            <div class="handle bl" data-handle="bl"></div>
+            <div class="handle br" data-handle="br"></div>
+            <div class="live-crop-hint">请将方框移动到完全框住人脸</div>
+          </div>
+        </div>
+        <canvas id="capture-canvas" style="display:none"></canvas>
+      </div>
+      <div class="camera-actions" id="camera-actions-live">
+        <input type="file" id="verify-single-input" accept="image/*" style="display:none" onchange="verifySingleImage(event)">
+        <button class="btn btn-outline" id="btn-verify-single" onclick="document.getElementById('verify-single-input').click()">🖼️ 验证单张图片</button>
+        <button class="btn btn-primary" id="btn-camera" onclick="toggleCamera()">开启摄像头</button>
+        <button class="btn btn-success" id="btn-capture" onclick="captureAndCrop()" disabled>📸 拍照并裁剪人脸</button>
+      </div>
+      <div class="cropped-preview" id="cropped-preview" style="display:none">
+        <div id="predict-result" style="display:none">
+          <div class="result-label" id="predict-label"></div>
+          <div style="font-size:13px;color:#94a3b8;margin-top:4px" id="predict-detail"></div>
+        </div>
+        <div class="cropped-actions">
+          <button class="btn btn-warning" id="btn-verify" onclick="verifyCropped()">🔍 立即验证</button>
+          <button class="btn btn-success" id="btn-add-dataset" onclick="showCategoryModal()">📁 添加到验证数据集</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="collapsible-header" onclick="toggleCollapse('val-preview-body','val-preview-arrow')">
+        <h3>📂 验证样本预览</h3>
+        <span class="collapsible-arrow open" id="val-preview-arrow">▼</span>
+      </div>
+      <div class="collapsible-body open" id="val-preview-body">
+        <div class="preview-tabs">
+          <div class="preview-tab active" onclick="switchValPreview('happy',this)">😊 开心</div>
+          <div class="preview-tab" onclick="switchValPreview('sad',this)">😢 伤心</div>
+        </div>
+        <div class="upload-area">
+          <input type="file" id="val-upload-input" accept="image/*" multiple onchange="uploadValImages()">
+          <button class="btn btn-success btn-sm" onclick="document.getElementById('val-upload-input').click()">📤 上传图片</button>
+          <button class="btn btn-primary btn-sm" id="btn-load-val" onclick="loadTestExamplesAsValData()">📂 加载默认验证样本</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteAllValImages()">🗑️ 删除当前分类全部</button>
+          <span id="val-upload-status" style="font-size:12px;color:#94a3b8"></span>
+        </div>
+        <div id="val-preview-gallery" class="gallery"></div>
+        <div class="pagination" id="val-preview-pagination"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2>测试集批量评估</h2>
+        <button class="btn btn-outline btn-sm" id="btn-test" onclick="runTest()">运行测试</button>
+      </div>
+      <div id="test-summary" class="stats" style="display:none"></div>
+    </div>
+
+    <div class="card" id="test-detail-card" style="display:none">
+      <h2>样本验证结果</h2>
+      <div id="test-results" class="result-grid"></div>
+    </div>
+
+  </div>
+</div>
+
+</div>
+
+<!-- 类别选择弹窗 -->
+<div class="modal-overlay" id="category-modal">
+  <div class="modal-box">
+    <h3>请选择情绪类别</h3>
+    <div class="modal-btns">
+      <button class="btn btn-success category-tab" onclick="addToDataset('happy')">😊 开心</button>
+      <button class="btn btn-primary category-tab" onclick="addToDataset('sad')">😢 伤心</button>
+    </div>
+    <div class="modal-btns" style="margin-top:8px">
+      <button class="btn btn-outline btn-sm" onclick="hideCategoryModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+<script src="src/app.js"></script>
+</body>
+</html>
