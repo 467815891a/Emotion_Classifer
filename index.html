@@ -34,6 +34,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f
 .btn-warning{background:#f59e0b;color:#fff}
 .btn-warning:hover{background:#d97706}
 .btn-sm{padding:5px 12px;font-size:12px}
+.upload-label{position:relative;overflow:hidden;cursor:pointer;display:inline-block}
+.upload-label input[type="file"]{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
 .progress-bar{width:100%;height:8px;background:#334155;border-radius:4px;overflow:hidden;margin:6px 0}
 .progress-fill{height:100%;border-radius:4px;transition:width .3s}
 .progress-fill.total{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
@@ -137,8 +139,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f
           <div class="preview-tab" onclick="switchPreview('sad',this)">😢 伤心</div>
         </div>
         <div class="upload-area">
-          <input type="file" id="train-upload-input" accept="image/*" multiple onchange="uploadTrainImages()">
-          <button class="btn btn-success btn-sm" onclick="document.getElementById('train-upload-input').click()">📤 上传图片</button>
+          <label class="btn btn-success btn-sm upload-label">📤 上传图片<input type="file" id="train-upload-input" accept="image/*" multiple onchange="uploadTrainImages()"></label>
           <button class="btn btn-primary btn-sm" id="btn-load-train" onclick="loadTestExamplesAsTrainData()">📂 加载默认训练样本</button>
           <button class="btn btn-danger btn-sm" onclick="deleteAllTrainImages()">🗑️ 删除当前分类全部</button>
           <span id="train-upload-status" style="font-size:12px;color:#94a3b8"></span>
@@ -202,9 +203,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f
         <canvas id="capture-canvas" style="display:none"></canvas>
       </div>
       <div class="camera-actions" id="camera-actions-live">
-        <input type="file" id="verify-single-input" accept="image/*" style="display:none" onchange="verifySingleImage(event)">
-        <button class="btn btn-outline" id="btn-verify-single" onclick="document.getElementById('verify-single-input').click()">🖼️ 验证单张图片</button>
-        <button class="btn btn-primary" id="btn-camera" onclick="toggleCamera()">开启摄像头</button>
+        <label class="btn btn-outline upload-label">🖼️ 验证单张图片<input type="file" id="verify-single-input" accept="image/*" onchange="verifySingleImage(event)"></label>
+        <label class="btn btn-primary upload-label" id="btn-camera-label">📷 拍照<input type="file" id="capture-camera-input" accept="image/*" capture="environment" onchange="verifySingleImage(event)"></label>
+        <button class="btn btn-primary" id="btn-camera" onclick="toggleCamera()" style="display:none">开启摄像头</button>
         <button class="btn btn-success" id="btn-capture" onclick="captureAndCrop()" disabled>📸 拍照并裁剪人脸</button>
       </div>
       <div class="cropped-preview" id="cropped-preview" style="display:none">
@@ -230,8 +231,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f
           <div class="preview-tab" onclick="switchValPreview('sad',this)">😢 伤心</div>
         </div>
         <div class="upload-area">
-          <input type="file" id="val-upload-input" accept="image/*" multiple onchange="uploadValImages()">
-          <button class="btn btn-success btn-sm" onclick="document.getElementById('val-upload-input').click()">📤 上传图片</button>
+          <label class="btn btn-success btn-sm upload-label">📤 上传图片<input type="file" id="val-upload-input" accept="image/*" multiple onchange="uploadValImages()"></label>
           <button class="btn btn-primary btn-sm" id="btn-load-val" onclick="loadTestExamplesAsValData()">📂 加载默认验证样本</button>
           <button class="btn btn-danger btn-sm" onclick="deleteAllValImages()">🗑️ 删除当前分类全部</button>
           <span id="val-upload-status" style="font-size:12px;color:#94a3b8"></span>

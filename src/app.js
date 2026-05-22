@@ -916,12 +916,16 @@ function getThumbUrl(img) {
     return canvas.toDataURL('image/jpeg', 0.7);
 }
 
-async function toggleCamera() {
+function toggleCamera() {
     if (cameraStream) {
         stopCamera();
-    } else {
-        await startCamera();
+        return;
     }
+    startCamera();
+}
+
+function isMobileDevice() {
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 }
 
 async function startCamera() {
@@ -983,6 +987,7 @@ function verifySingleImage(event) {
     document.getElementById('predict-result').style.display = 'none';
 
     var btnCapture = document.getElementById('btn-capture');
+    btnCapture.style.display = '';
     btnCapture.disabled = false;
     btnCapture.textContent = '✂️ 裁切人脸';
     btnCapture.onclick = cropSingleImage;
@@ -1814,6 +1819,8 @@ async function loadTestExamplesAsValData() {
 async function init() {
     addLog('初始化情绪分类器...', 'info');
 
+    setupCameraUI();
+
     var modelLabel = MODEL_CONFIGS[currentModelName].label;
     addLog('架构: ' + modelLabel + ' 特征提取 (ORT) + JS 分类头微调', 'info');
     await initORT();
@@ -1829,6 +1836,28 @@ async function init() {
 
     addLog('系统就绪', 'success');
     addLog('提示: 请上传训练图片或使用测试样本开始训练', 'info');
+}
+
+function setupCameraUI() {
+    var isMobile = isMobileDevice();
+    var isSecure = window.isSecureContext;
+    var hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    var canUseLiveCamera = !isMobile && isSecure && hasMediaDevices;
+
+    var btnCamera = document.getElementById('btn-camera');
+    var btnCameraLabel = document.getElementById('btn-camera-label');
+
+    if (canUseLiveCamera) {
+        btnCamera.style.display = '';
+        btnCameraLabel.style.display = 'none';
+    } else {
+        btnCamera.style.display = 'none';
+        btnCameraLabel.style.display = '';
+        if (!isSecure && !isMobile) {
+            addLog('非安全上下文: 实时摄像头不可用，请用 localhost 访问', 'warn');
+            addLog('或 Chrome 访问 chrome://flags/#unsafely-treat-insecure-origin-as-secure', 'info');
+        }
+    }
 }
 
 window.addEventListener('DOMContentLoaded', init);
