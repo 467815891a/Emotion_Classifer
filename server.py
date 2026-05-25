@@ -3,12 +3,22 @@ import sys
 import socket
 import threading
 import http.server
-import webbrowser
-import tkinter as tk
-from tkinter import ttk, messagebox
+import argparse
 import zipfile
 import io
 import urllib.parse
+
+# 判断是否为静默模式（-p 参数启动）
+_silent_mode = False
+for i, arg in enumerate(sys.argv[1:], 1):
+    if arg == '-p':
+        _silent_mode = True
+        break
+
+if not _silent_mode:
+    import webbrowser
+    import tkinter as tk
+    from tkinter import ttk, messagebox
 
 if getattr(sys, 'frozen', False):
     Www_DIR = sys._MEIPASS
@@ -137,7 +147,11 @@ class COOPHandler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
     def log_message(self, format, *args):
-        pass
+        if _silent_mode:
+            sys.stderr.write("%s - - [%s] %s\n" %
+                             (self.client_address[0],
+                              self.log_date_time_string(),
+                              format % args))
 
 
 class ServerApp:
@@ -368,11 +382,58 @@ class ServerApp:
                 pass
 
 
+def run_silent(port):
+    """静默模式：不启动 tkinter，日志打印到终端"""
+    print(f'[情绪分类器] 静默模式启动，端口: {port}')
+
+    results = ensure_dirs()
+    for r in results:
+        print(f'  {r}')
+
+    try:
+        server = http.server.ThreadingHTTPServer(('0.0.0.0', port), COOPHandler)
+    except OSError as e:
+        print(f'[错误] 无法启动服务器: {e}')
+        sys.exit(1)
+
+    print(f'[情绪分类器] Web 服务器已启动: http://localhost:{port}')
+    print(f'[情绪分类器] 监听地址: 0.0.0.0 (所有网络接口)')
+
+    lan_ip = get_lan_ip()
+    if lan_ip:
+        print(f'[情绪分类器] 局域网访问: http://{lan_ip}:{port}')
+    else:
+        print('[情绪分类器] 无法获取局域网 IP 地址')
+
+    print('[情绪分类器] Cross-Origin Isolation 头已配置')
+    print('[情绪分类器] 按 Ctrl+C 停止服务器')
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print('\n[情绪分类器] 正在停止服务器...')
+        server.shutdown()
+        server.server_close()
+        print('[情绪分类器] 服务器已关闭')
+
+
 def main():
-    root = tk.Tk()
-    app = ServerApp(root)
-    root.protocol('WM_DELETE_WINDOW', app.on_close)
-    root.mainloop()
+    parser = argparse.ArgumentParser(description='情绪分类器 Web 服务器')
+    parser.add_argument('-p', '--port', type=int, metavar='PORT',
+                        help='指定端口号，以静默模式启动（不弹出 GUI 窗口，日志输出到终端）')
+    args = parser.parse_args()
+
+    if args.port is not None:
+        port = args.port
+        if port < 1 or port > 65535:
+            print(f'[错误] 无效端口号: {port}，请输入 1-65535 之间的整数。')
+            sys.exit(1)
+        run_silent(port)
+    else:
+        root = tk.Tk()
+        app = ServerApp(root)
+        root.protocol('WM_DELETE_WINDOW', app.on_close)
+        root.mainloop()
 
 
 if __name__ == '__main__':
